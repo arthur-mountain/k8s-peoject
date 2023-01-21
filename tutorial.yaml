@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+  labels:
+    app: mysql-practice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-practice
+  template:
+    metadata:
+      labels:
+        app: mysql-practice
+    spec:
+      containers:
+        - name: my-todo-mysql
+          image: mysql
+          ports:
+            - name: mysql-port
+              containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_DATABASE
+          volumeMounts:
+            - name: mysql-init-scripts
+              mountPath: docker-entrypoint-initdb.d/init.sql
+          #args:
+          #  - /bin/sh
+          #  - -c
+          #  - touch /tmp/healthy; sleep 30;
+          #  - rm -rf /tmp/healthy; sleep 600
+          # k8s pod 健康檢查
+          livenessProbe:
+            # 1. Use shell command
+            #exec:
+            #  command:
+            #    - cat
+            #    - /tmp/healthy
+            #initialDelaySeconds: 5
+            #failureThreshold: 3 # health check 失敗後, k8s 會重試次數
+            #periodSeconds: 5 # 每秒 health check
+            # 2. Use rest api
+            #httpGet:
+            #  #host # 主機位址, 默認就是 pod ip
+            #  #scheme #HTTP or HTTPS, 默認是 HTTP
+            #  path: /index.html
+            #  port: 80
+            #  httpHeaders:
+            #    - name: Custom-Header
+            #      value: Awesome
+            #initialDelaySeconds: 30
+            #timeoutSeconds: 1
+            # 3. Use tcp socket
+            tcpSocket:
+              port: 3306
+            initialDelaySeconds: 60
+            periodSeconds: 60
+          # 確認 k8s pod 是否準備就緒
+          #readinessProbe:
+          #  httpGet:
+          #    path: /healthy
+          #    port: 8080
+          #  initialDelaySeconds: 1
+          #  periodSeconds: 10
+          #  timeoutSeconds: 1
+          #  failureThreshold: 3
+          resources: {}
+            #requests:
+            #  memory: "512Mi"
+            #  cpu: "800m" # 500m = 0.5核, 1000m = 1 核
+            #limits:
+            #  memory: "1024Mi"
+            #  cpu: "1.5"
+      volumes:
+        - name: mysql-init-scripts
+          hostPath:
+            path: /Users/aarontai/Desktop/simple-project/k8s-project/scripts/mysql/init.sql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-practice-service
+spec:
+  type: NodePort
+  selector:
+    app: mysql-practice
+  ports:
+    - name: mysql-practice
+      protocol: TCP
+      port: 3306
+      targetPort: mysql-port
+      nodePort: 30001

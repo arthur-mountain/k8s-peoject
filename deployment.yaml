@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-todo-deployment
+  labels:
+    app: todo-label
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-label
+  template:
+    metadata:
+      labels:
+        app: todo-label
+    spec:
+      containers:
+        - name: my-todo-redis
+          image: redis
+          ports:
+            - name: redis-port
+              containerPort: 6379
+          resources: {}
+
+        - name: my-todo-mysql
+          image: mysql
+          ports:
+            - name: mysql-port
+              containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_ROOT_USER
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_DATABASE
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: MYSQL_PASSWORD
+          volumeMounts:
+            - name: mysql-init-scripts
+              mountPath: docker-entrypoint-initdb.d/init.sql
+          resources: {}
+
+        - name: my-todo-rebbitmq
+          image: rabbitmq:management
+          ports:
+            - name: rebbit-management-port
+              containerPort: 15672
+            - name: rebbit-port
+              containerPort: 5672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: RABBITMQ_DEFAULT_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: my-todo-secrets
+                  key: RABBITMQ_DEFAULT_PASSWORD
+          resources: {}
+      volumes:
+        - name: mysql-init-scripts
+          hostPath:
+            path: ./scripts/init.sql
+            # type: Directory
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-todo-service
+  spec:
+    type: LoadBalancer
+    selector:
+      app: todo-label
+      ports:
+        - name: my-todo-redis-service-port
+          protocol: TCP
+          port: 6379
+          targetPort: redis-port
+          nodePort: 30001
+
+        - name: my-todo-mysql-service-port
+          protocol: TCP
+          port: 3306
+          targetPort: mysql-port
+          nodePort: 30002
+
+        - name: my-todo-rebbitmq-management-service-port
+          protocol: TCP
+          port: 15672
+          targetPort: rebbmit-management-port
+          nodePort: 30004
+
+        - name: my-todo-rebbitmq-service-port
+          protocol: TCP
+          port: 5672
+          targetPort: rebbmit-port
+          nodePort: 30005

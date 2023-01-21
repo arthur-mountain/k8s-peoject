@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+# deployment metadata
+metadata:
+  name: my-nginx-deployment # deployment name
+  labels:
+    app: nginx-label # deployment label
+spec:
+  replicas: 2 # replicas 同時建立 2 個 nginx 的 pod
+  # replicas 的效果套用於
+  # template.metadata.labels === metadata.labels.app=nginx-label 的 pod 上
+  selector:
+    matchLabels:
+      app: nginx-label
+  # spec.template === pod 的定義
+  template:
+    metadata: # pod metadata
+      labels:
+        app: nginx-label
+    # spec.template.spec === container 的定義
+    spec:
+      containers: # 此 pod 只運行了一個 nginx container
+        - name: nginx-container
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+          resources: {} # container 的資源設定
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-nginx-service
+spec:
+  type: NodePort
+  # type: loadbalancer
+  selector:
+    app: nginx-label # 選定需套用此 service 的 label of deployment or pod
+  ports:
+    - name: my-nginx-service-port
+      protocol: TCP
+      port: 80 # service port(this port for communicate between pod?)
+      targetPort: 80 # forward service port to container port
+      nodePort: 30080 # node port between [30000-32767]
+      # example: visited node 32000 port => service 80 port => container 80 port?
+      # 目前外部透過 port 可連線至 pod 中，但透過 nodePort 會連不到東西？
+      # clusterIP: 10.0.171.239 # Cluster IP will be auto random created by k8s
